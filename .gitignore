@@ -25,6 +25,9 @@ coverage/
 
 # TypeScript cache
 *.tsbuildinfo
+.eslintcache
+.cache/
+.turbo/
 
 # Runtime/temp files
 tmp/
@@ -32,15 +35,29 @@ temp/
 *.pid
 *.seed
 
+# Local generated assets and pipeline artifacts
+/uploads/
+/artifacts/
+/storage/
+
 # Prisma local-only database files
-prisma/dev.db
-prisma/dev.db-journal
+prisma/*.db
+prisma/*.db-journal
+
+# Local secret/key material
+*.local
+*.pem
+*.key
 
 # OS and editor files
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
+
+# Deployment/tooling local state
+.vercel/
+.netlify/
 
 # Package manager caches
 .npm/

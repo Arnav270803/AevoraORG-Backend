@@ -15,3 +15,17 @@ export function validateBody(schema: ZodSchema) {
     next();
   };
 }
+
+export function validateParams(schema: ZodSchema) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.params);
+
+    if (!result.success) {
+      next(new BadRequestError("Invalid route parameters."));
+      return;
+    }
+
+    req.params = result.data;
+    next();
+  };
+}

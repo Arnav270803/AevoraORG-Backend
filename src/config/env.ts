@@ -14,6 +14,7 @@ const envSchema = z.object({
   JWT_AUDIENCE: z.string().default("aevora-web"),
   FRONTEND_ORIGIN: z.string().min(1).default("http://localhost:5173"),
   BACKEND_URL: z.string().url().default("http://localhost:4000"),
+  LOCAL_STORAGE_PUBLIC_BASE_URL: z.string().url().optional(),
 });
 
 export const env = envSchema.parse(process.env);

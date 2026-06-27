@@ -6,8 +6,11 @@ import { corsOptions } from "./config/cors";
 import { env } from "./config/env";
 import { errorHandler } from "./middleware/error-handler";
 import { notFoundHandler } from "./middleware/not-found";
+import { adRouter } from "./modules/ads/ad.routes";
 import { authRouter } from "./modules/auth/auth.routes";
 import { healthRouter } from "./modules/health/health.routes";
+import { pipelineJobRouter } from "./modules/pipeline-jobs/pipeline-job.routes";
+import { projectRouter } from "./modules/projects/project.routes";
 
 export function createApp() {
   const app = express();
@@ -23,6 +26,9 @@ export function createApp() {
 
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
+  app.use("/api/projects", projectRouter);
+  app.use("/api/ads", adRouter);
+  app.use("/api/pipeline-jobs", pipelineJobRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

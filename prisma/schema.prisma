@@ -8,17 +8,20 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  emailVerified Boolean        @default(false)
-  name          String?
-  avatarUrl     String?
-  role          UserRole       @default(USER)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  lastLoginAt   DateTime?
-  authAccounts  AuthAccount[]
-  refreshTokens RefreshToken[]
+  id             String         @id @default(uuid())
+  email          String         @unique
+  emailVerified  Boolean        @default(false)
+  name           String?
+  avatarUrl      String?
+  role           UserRole       @default(USER)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  lastLoginAt    DateTime?
+  authAccounts   AuthAccount[]
+  projects       Project[]
+  uploadedAssets Asset[]
+  requestedJobs  PipelineJob[]
+  refreshTokens  RefreshToken[]
 
   @@map("users")
 }
@@ -38,20 +41,160 @@ model AuthAccount {
 }
 
 model RefreshToken {
-  id          String    @id @default(uuid())
-  userId      String
-  tokenHash   String    @unique
-  expiresAt   DateTime
-  revokedAt   DateTime?
-  createdAt   DateTime  @default(now())
-  lastUsedAt  DateTime?
-  userAgent   String?
-  ipAddress   String?
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  userAgent  String?
+  ipAddress  String?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
   @@map("refresh_tokens")
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  ownerId     String
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  metadata    Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  owner       User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ads         Ad[]
+
+  @@index([ownerId])
+  @@index([ownerId, status])
+  @@map("projects")
+}
+
+model Ad {
+  id              String         @id @default(uuid())
+  projectId       String
+  title           String
+  status          AdStatus       @default(DRAFT)
+  productName     String?
+  brandName       String?
+  category        String?
+  referenceNotes  String?
+  objective       String?
+  platform        String?
+  aspectRatio     String?
+  durationSeconds Int?
+  creativeBrief   Json?
+  pipelineSpec    Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assets          Asset[]
+  pipelineJobs    PipelineJob[]
+  renderOutputs   RenderOutput[]
+
+  @@index([projectId])
+  @@index([projectId, status])
+  @@map("ads")
+}
+
+model Asset {
+  id              String      @id @default(uuid())
+  adId            String
+  uploadedById    String
+  kind            AssetKind   @default(OTHER)
+  status          AssetStatus @default(REGISTERED)
+  fileName        String
+  mimeType        String
+  sizeBytes       Int?
+  storageProvider String
+  storageKey      String
+  url             String?
+  checksum        String?
+  metadata        Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  ad              Ad          @relation(fields: [adId], references: [id], onDelete: Cascade)
+  uploadedBy      User        @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([adId])
+  @@index([uploadedById])
+  @@map("assets")
+}
+
+model PipelineJob {
+  id             String            @id @default(uuid())
+  adId           String
+  requestedById  String
+  type           PipelineJobType   @default(AD_GENERATION)
+  status         PipelineJobStatus @default(QUEUED)
+  priority       Int               @default(0)
+  provider       String?
+  externalJobId  String?
+  requestPayload Json?
+  resultPayload  Json?
+  errorCode      String?
+  errorMessage   String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  startedAt      DateTime?
+  completedAt    DateTime?
+  ad             Ad                @relation(fields: [adId], references: [id], onDelete: Cascade)
+  requestedBy    User              @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+  stepRuns       PipelineStepRun[]
+  renderOutputs  RenderOutput[]
+
+  @@index([adId])
+  @@index([requestedById])
+  @@index([status])
+  @@map("pipeline_jobs")
+}
+
+model PipelineStepRun {
+  id             String             @id @default(uuid())
+  jobId          String
+  name           String
+  status         PipelineStepStatus @default(PENDING)
+  sequence       Int
+  provider       String?
+  externalStepId String?
+  inputPayload   Json?
+  outputPayload  Json?
+  errorCode      String?
+  errorMessage   String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  startedAt      DateTime?
+  completedAt    DateTime?
+  job            PipelineJob        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, sequence])
+  @@index([jobId])
+  @@map("pipeline_step_runs")
+}
+
+model RenderOutput {
+  id              String           @id @default(uuid())
+  adId            String
+  jobId           String?
+  kind            RenderOutputKind
+  storageProvider String
+  storageKey      String
+  url             String?
+  mimeType        String?
+  sizeBytes       Int?
+  metadata        Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  ad              Ad               @relation(fields: [adId], references: [id], onDelete: Cascade)
+  job             PipelineJob?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([adId])
+  @@index([jobId])
+  @@map("render_outputs")
 }
 
 enum AuthProvider {
@@ -61,4 +204,60 @@ enum AuthProvider {
 enum UserRole {
   USER
   ADMIN
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum AdStatus {
+  DRAFT
+  READY
+  GENERATING
+  COMPLETED
+  FAILED
+  ARCHIVED
+}
+
+enum AssetKind {
+  PRODUCT_IMAGE
+  REFERENCE_IMAGE
+  LOGO
+  BRAND_GUIDE
+  OTHER
+}
+
+enum AssetStatus {
+  REGISTERED
+  READY
+  FAILED
+}
+
+enum PipelineJobType {
+  AD_GENERATION
+  RENDER_EXPORT
+}
+
+enum PipelineJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum PipelineStepStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+enum RenderOutputKind {
+  VIDEO
+  IMAGE
+  SCRIPT
+  METADATA
 }
