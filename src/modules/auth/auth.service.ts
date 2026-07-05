@@ -3,12 +3,31 @@ import type { User } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { userService } from "../users/user.service";
 import { NotFoundError, UnauthorizedError } from "../../utils/errors";
-import type { AuthSession, GoogleSignInInput, PublicUser, RefreshSessionInput } from "./auth.types";
+import { env } from "../../config/env";
+import type { AuthSession, DevSignInInput, GoogleSignInInput, PublicUser, RefreshSessionInput } from "./auth.types";
 import { verifyGoogleCredential } from "./google.service";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "./jwt.service";
 import { getRefreshTokenExpiresAt, hashRefreshToken } from "./refresh-token.service";
 
 export const authService = {
+  async signInForDevelopment(input: DevSignInInput): Promise<AuthSession> {
+    if (env.NODE_ENV === "production") {
+      throw new UnauthorizedError("Development sign-in is disabled in production.");
+    }
+
+    const user = await userService.upsertGoogleUser({
+      providerUserId: `dev:${input.email}`,
+      email: input.email,
+      emailVerified: true,
+      name: input.name,
+    });
+
+    return createSessionForUser(user, {
+      userAgent: input.userAgent,
+      ipAddress: input.ipAddress,
+    });
+  },
+
   async signInWithGoogle(input: GoogleSignInInput): Promise<AuthSession> {
     const googleProfile = await verifyGoogleCredential(input.credential);
     const user = await userService.upsertGoogleUser(googleProfile);

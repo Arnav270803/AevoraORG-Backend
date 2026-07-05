@@ -15,6 +15,8 @@ const envSchema = z.object({
   FRONTEND_ORIGIN: z.string().min(1).default("http://localhost:5173"),
   BACKEND_URL: z.string().url().default("http://localhost:4000"),
   LOCAL_STORAGE_PUBLIC_BASE_URL: z.string().url().optional(),
+  PIPELINE_LOCAL_OUTPUT_DIR: z.string().min(1).default("../Aevora_Agentic_core/output"),
+  AEVORA_PIPELINE_SERVICE_TOKEN: z.string().min(16).default("dev-pipeline-service-token"),
 });
 
 export const env = envSchema.parse(process.env);

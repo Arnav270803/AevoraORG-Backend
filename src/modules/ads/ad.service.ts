@@ -41,16 +41,23 @@ export const adService = {
         assets: {
           orderBy: { createdAt: "desc" },
         },
+        shots: {
+          orderBy: { shotNumber: "asc" },
+        },
         pipelineJobs: {
           orderBy: { createdAt: "desc" },
           include: {
             stepRuns: {
               orderBy: { sequence: "asc" },
             },
+            providerJobs: true,
             renderOutputs: true,
           },
         },
         renderOutputs: {
+          orderBy: { createdAt: "desc" },
+        },
+        providerJobs: {
           orderBy: { createdAt: "desc" },
         },
       },

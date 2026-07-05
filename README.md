@@ -285,21 +285,42 @@ Future implementations can replace this provider with S3, Supabase Storage, Clou
 
 ## Future Pipeline Service Contract
 
-The future pipeline service should treat this backend as the source of truth for:
+The pipeline service treats this backend as the source of truth for:
 
 - ad draft inputs and asset metadata
 - pipeline job IDs and requested job payloads
 - step status updates
 - render output records
 
-In the next pipeline loop, add protected internal/service APIs for the pipeline worker to:
+Protected internal/service APIs are available under `/api/internal` for the pipeline worker to:
 
 - claim or read queued `PipelineJob` records
 - update `PipelineJob.status`, `startedAt`, `completedAt`, `resultPayload`, and error fields
 - create/update `PipelineStepRun` records as stages start and finish
 - create `RenderOutput` records for generated videos, images, scripts, and metadata
+- create/update shot records
+- register generated mock or provider asset records
 
 Keep provider-specific details in JSON payloads or infrastructure adapters, not in project/ad business modules.
+
+Internal routes require:
+
+```http
+Authorization: Bearer AEVORA_PIPELINE_SERVICE_TOKEN
+```
+
+Implemented internal routes:
+
+```http
+POST  /api/internal/pipeline-jobs/claim
+GET   /api/internal/pipeline-jobs/:jobId/context
+PATCH /api/internal/pipeline-jobs/:jobId
+PATCH /api/internal/pipeline-step-runs/:stepRunId
+POST  /api/internal/ads/:adId/shots
+PATCH /api/internal/shots/:shotId
+POST  /api/internal/ads/:adId/assets/generated
+POST  /api/internal/ads/:adId/render-outputs
+```
 
 ## Required Setup Values
 
@@ -312,6 +333,8 @@ Fill these in `.env` before running locally:
 - `FRONTEND_ORIGIN`: local frontend origin, likely `http://localhost:5173`.
 - `BACKEND_URL`: local backend URL, likely `http://localhost:4000`.
 - `LOCAL_STORAGE_PUBLIC_BASE_URL`: optional local placeholder asset URL base. Defaults to `${BACKEND_URL}/local-assets` when omitted.
+- `PIPELINE_LOCAL_OUTPUT_DIR`: local folder served at `/pipeline-output` for agentic pipeline artifacts. Defaults to `../Aevora_Agentic_core/output`.
+- `AEVORA_PIPELINE_SERVICE_TOKEN`: shared secret for `Aevora_Agentic_core` internal worker calls.
 
 Then run:
 
@@ -322,6 +345,16 @@ npm run prisma:migrate
 npm run dev
 ```
 
+Run the mock worker in another terminal after a frontend-created job is queued:
+
+```bash
+cd ../Aevora_Agentic_core
+npm install
+npm run run-once
+```
+
+Use `npm run dev` in `Aevora_Agentic_core` for a polling worker loop.
+
 ## Completed Foundation
 
 - Google OAuth/JWT auth is preserved.
@@ -330,6 +363,9 @@ npm run dev
 - Asset records can be registered against owned ads through a provider-agnostic storage interface.
 - Pipeline job and step-run records can be created/listed/read for owned ads.
 - Render output table is ready for future generated assets.
+- Internal pipeline worker APIs are available behind service-token auth.
+- Shot and provider job records support autonomous ad generation stages.
+- The mock worker can complete a local pipeline job through structured planning, shot records, mock keyframe/video assets, final render metadata, and QC metadata.
 - Zod validates request bodies and route params.
 - Prisma migration `20260627075113_backend_foundation` adds the backend foundation tables and enums.
 

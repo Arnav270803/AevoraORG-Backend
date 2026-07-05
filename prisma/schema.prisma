@@ -94,7 +94,9 @@ model Ad {
   project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assets          Asset[]
   pipelineJobs    PipelineJob[]
+  providerJobs    ProviderJob[]
   renderOutputs   RenderOutput[]
+  shots           Shot[]
 
   @@index([projectId])
   @@index([projectId, status])
@@ -145,6 +147,7 @@ model PipelineJob {
   ad             Ad                @relation(fields: [adId], references: [id], onDelete: Cascade)
   requestedBy    User              @relation(fields: [requestedById], references: [id], onDelete: Restrict)
   stepRuns       PipelineStepRun[]
+  providerJobs   ProviderJob[]
   renderOutputs  RenderOutput[]
 
   @@index([adId])
@@ -170,6 +173,7 @@ model PipelineStepRun {
   startedAt      DateTime?
   completedAt    DateTime?
   job            PipelineJob        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  providerJobs   ProviderJob[]
 
   @@unique([jobId, sequence])
   @@index([jobId])
@@ -186,6 +190,9 @@ model RenderOutput {
   url             String?
   mimeType        String?
   sizeBytes       Int?
+  width           Int?
+  height          Int?
+  durationMs      Int?
   metadata        Json?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -195,6 +202,51 @@ model RenderOutput {
   @@index([adId])
   @@index([jobId])
   @@map("render_outputs")
+}
+
+model Shot {
+  id              String     @id @default(uuid())
+  adId            String
+  shotNumber      Int
+  role            String
+  status          ShotStatus @default(PLANNED)
+  durationSeconds Int
+  promptPayload   Json
+  keyframeAssetId String?
+  videoAssetId    String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  ad              Ad         @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@unique([adId, shotNumber])
+  @@index([adId])
+  @@map("shots")
+}
+
+model ProviderJob {
+  id             String             @id @default(uuid())
+  adId           String
+  jobId          String?
+  stepRunId      String?
+  provider       String
+  model          String?
+  operationId    String?
+  status         ProviderJobStatus  @default(QUEUED)
+  requestPayload Json?
+  responsePayload Json?
+  errorCode      String?
+  errorMessage   String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  ad             Ad                 @relation(fields: [adId], references: [id], onDelete: Cascade)
+  job            PipelineJob?       @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  stepRun        PipelineStepRun?   @relation(fields: [stepRunId], references: [id], onDelete: SetNull)
+
+  @@index([adId])
+  @@index([jobId])
+  @@index([stepRunId])
+  @@index([status])
+  @@map("provider_jobs")
 }
 
 enum AuthProvider {
@@ -253,6 +305,21 @@ enum PipelineStepStatus {
   SUCCEEDED
   FAILED
   SKIPPED
+}
+
+enum ShotStatus {
+  PLANNED
+  KEYFRAME_READY
+  VIDEO_READY
+  FAILED
+}
+
+enum ProviderJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  BLOCKED
 }
 
 enum RenderOutputKind {

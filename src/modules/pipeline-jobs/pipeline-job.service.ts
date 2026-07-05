@@ -29,6 +29,7 @@ export const pipelineJobService = {
         stepRuns: {
           orderBy: { sequence: "asc" },
         },
+        providerJobs: true,
         renderOutputs: true,
       },
     });
@@ -44,6 +45,7 @@ export const pipelineJobService = {
         stepRuns: {
           orderBy: { sequence: "asc" },
         },
+        providerJobs: true,
         renderOutputs: true,
       },
     });
@@ -68,6 +70,7 @@ export const pipelineJobService = {
         stepRuns: {
           orderBy: { sequence: "asc" },
         },
+        providerJobs: true,
         renderOutputs: true,
       },
     });

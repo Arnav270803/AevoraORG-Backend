@@ -2,6 +2,17 @@ import type { RequestHandler } from "express";
 import { HTTP_STATUS } from "../../constants/http";
 import { authService } from "./auth.service";
 
+export const devSignIn: RequestHandler = async (req, res) => {
+  const session = await authService.signInForDevelopment({
+    email: req.body.email,
+    name: req.body.name,
+    userAgent: req.header("user-agent"),
+    ipAddress: req.ip,
+  });
+
+  res.status(HTTP_STATUS.OK).json(session);
+};
+
 export const googleSignIn: RequestHandler = async (req, res) => {
   const session = await authService.signInWithGoogle({
     credential: req.body.credential,

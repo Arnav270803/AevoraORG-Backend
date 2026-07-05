@@ -33,6 +33,13 @@ export type GoogleSignInInput = {
   ipAddress?: string;
 };
 
+export type DevSignInInput = {
+  email: string;
+  name: string;
+  userAgent?: string;
+  ipAddress?: string;
+};
+
 export type RefreshSessionInput = {
   refreshToken: string;
   userAgent?: string;
