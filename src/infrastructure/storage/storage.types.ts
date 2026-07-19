@@ -5,6 +5,10 @@ export type PrepareAssetInput = {
   mimeType: string;
 };
 
+export type WriteAssetInput = PrepareAssetInput & {
+  data: Uint8Array;
+};
+
 export type PreparedStorageObject = {
   provider: string;
   key: string;
@@ -13,4 +17,5 @@ export type PreparedStorageObject = {
 
 export interface StorageProvider {
   prepareAsset(input: PrepareAssetInput): Promise<PreparedStorageObject>;
+  writeAsset(input: WriteAssetInput): Promise<PreparedStorageObject>;
 }

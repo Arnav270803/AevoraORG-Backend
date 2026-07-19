@@ -12,4 +12,14 @@ export const createAssetSchema = z.object({
   metadata: jsonObjectSchema.optional(),
 });
 
+export const uploadAssetSchema = z.object({
+  kind: assetKindSchema.default("OTHER"),
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+  sizeBytes: z.number().int().positive().max(5 * 1024 * 1024).optional(),
+  dataBase64: z.string().min(1).max(7_100_000).regex(/^[A-Za-z0-9+/]+={0,2}$/),
+  metadata: jsonObjectSchema.optional(),
+});
+
 export type CreateAssetInput = z.infer<typeof createAssetSchema>;
+export type UploadAssetInput = z.infer<typeof uploadAssetSchema>;

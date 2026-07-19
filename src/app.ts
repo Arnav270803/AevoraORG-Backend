@@ -19,12 +19,21 @@ export function createApp() {
 
   app.use(helmet());
   app.use(cors(corsOptions));
-  app.use(express.json({ limit: "1mb" }));
+  app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: false }));
 
   if (env.NODE_ENV !== "test") {
     app.use(morgan("dev"));
   }
+
+  app.use(
+    "/local-assets",
+    (_request, response, next) => {
+      response.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      next();
+    },
+    express.static(resolve(env.LOCAL_STORAGE_DIR)),
+  );
 
   app.use(
     "/pipeline-output",

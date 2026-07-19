@@ -1,4 +1,4 @@
-import { LocalPlaceholderStorageProvider } from "./local-placeholder-storage.provider";
+import { LocalStorageProvider } from "./local-storage.provider";
 import type { StorageProvider } from "./storage.types";
 
-export const storageProvider: StorageProvider = new LocalPlaceholderStorageProvider();
+export const storageProvider: StorageProvider = new LocalStorageProvider();

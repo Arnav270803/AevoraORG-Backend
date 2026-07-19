@@ -14,3 +14,9 @@ export const listAssets: RequestHandler = async (req, res) => {
 
   res.status(HTTP_STATUS.OK).json({ assets });
 };
+
+export const uploadAsset: RequestHandler = async (req, res) => {
+  const asset = await assetService.uploadAsset(getAuthenticatedUserId(req), req.params.adId, req.body);
+
+  res.status(HTTP_STATUS.CREATED).json({ asset });
+};
