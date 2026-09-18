@@ -7,7 +7,8 @@ export function validateBody(schema: ZodSchema) {
     const result = schema.safeParse(req.body);
 
     if (!result.success) {
-      next(new BadRequestError("Invalid request body."));
+      const issue = result.error.issues[0];
+      next(new BadRequestError(issue ? `${issue.path.length ? `${issue.path.join(".")}: ` : ""}${issue.message}` : "Invalid request body."));
       return;
     }
 

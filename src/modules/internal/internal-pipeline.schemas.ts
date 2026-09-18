@@ -25,6 +25,8 @@ export const internalShotIdParamSchema = z.object({
 export const claimPipelineJobSchema = z.object({
   workerId: optionalTrimmedString(120),
   type: z.enum(["AD_GENERATION", "RENDER_EXPORT"]).default("AD_GENERATION"),
+  types: z.array(z.enum(["AD_GENERATION", "GUIDED_GENERATION", "RENDER_EXPORT"])).min(1).max(3).optional(),
+  contractVersion: z.literal(1).optional(),
 });
 
 export const updatePipelineJobSchema = z.object({

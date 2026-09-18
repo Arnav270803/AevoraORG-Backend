@@ -4,8 +4,9 @@ import { prisma } from "../../db/prisma";
 import { storageProvider } from "../../infrastructure/storage";
 import { BadRequestError, NotFoundError } from "../../utils/errors";
 import type { CreateAssetInput, UploadAssetInput } from "./asset.schemas";
+import { assertUploadSignature } from "./asset-content";
 
-const MAX_LOCAL_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_LOCAL_MEDIA_BYTES = 5 * 1024 * 1024;
 
 export const assetService = {
   async createAsset(ownerId: string, adId: string, input: CreateAssetInput) {
@@ -48,13 +49,15 @@ export const assetService = {
     await assertAdOwner(ownerId, adId);
 
     const data = Buffer.from(input.dataBase64, "base64");
-    if (data.byteLength === 0 || data.byteLength > MAX_LOCAL_IMAGE_BYTES) {
-      throw new BadRequestError("Image uploads must be 5MB or smaller.");
+    if (data.byteLength === 0 || data.byteLength > MAX_LOCAL_MEDIA_BYTES) {
+      throw new BadRequestError("Image and audio uploads must be 5MB or smaller.");
     }
 
     if (input.sizeBytes !== undefined && input.sizeBytes !== data.byteLength) {
-      throw new BadRequestError("Uploaded image size does not match the request metadata.");
+      throw new BadRequestError("Uploaded media size does not match the request metadata.");
     }
+
+    assertUploadSignature(data, input.mimeType);
 
     const preparedAsset = await storageProvider.writeAsset({
       ownerId,

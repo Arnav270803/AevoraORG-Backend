@@ -1,13 +1,18 @@
 import type { PipelineJobType, Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
-import { NotFoundError } from "../../utils/errors";
+import { BadRequestError, NotFoundError } from "../../utils/errors";
+import { lockAd, transaction, isGuided } from "../workspace/workspace.repository";
+import { conflict, objectValue } from "../workspace/workspace.rules";
+import { publicJob } from "../workspace/workspace.service";
 import type { CreatePipelineJobInput } from "./pipeline-job.schemas";
 
 export const pipelineJobService = {
   async createPipelineJob(ownerId: string, adId: string, input: CreatePipelineJobInput) {
-    await assertAdOwner(ownerId, adId);
-
-    return prisma.pipelineJob.create({
+    return transaction(async (tx) => {
+      const ad = await lockAd(tx, adId, ownerId);
+      if (Object.prototype.hasOwnProperty.call(input.requestPayload ?? {}, "guided")) throw new BadRequestError("Guided snapshots can only be created by the workspace action API.");
+      if (ad.workflowMode === "GUIDED" || objectValue(ad.pipelineSpec).mode === "guided" || await tx.creativeArtifact.count({ where: { adId } })) conflict("Use workspace actions for guided ads; arbitrary automatic stage requests are disabled.");
+      return tx.pipelineJob.create({
       data: {
         adId,
         requestedById: ownerId,
@@ -32,13 +37,14 @@ export const pipelineJobService = {
         providerJobs: true,
         renderOutputs: true,
       },
+      });
     });
   },
 
   async listPipelineJobs(ownerId: string, adId: string) {
     await assertAdOwner(ownerId, adId);
 
-    return prisma.pipelineJob.findMany({
+    const jobs = await prisma.pipelineJob.findMany({
       where: { adId },
       orderBy: { createdAt: "desc" },
       include: {
@@ -49,6 +55,7 @@ export const pipelineJobService = {
         renderOutputs: true,
       },
     });
+    return jobs.map((job) => isGuided(job) ? publicJob(job) : job);
   },
 
   async getPipelineJob(ownerId: string, jobId: string) {
@@ -79,7 +86,7 @@ export const pipelineJobService = {
       throw new NotFoundError("Pipeline job was not found.");
     }
 
-    return job;
+    return isGuided(job) ? publicJob(job) : job;
   },
 };
 

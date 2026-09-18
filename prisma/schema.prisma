@@ -22,6 +22,8 @@ model User {
   uploadedAssets Asset[]
   requestedJobs  PipelineJob[]
   refreshTokens  RefreshToken[]
+  creativeRevisions CreativeRevision[]
+  creativeApprovals CreativeApproval[]
 
   @@map("users")
 }
@@ -89,6 +91,7 @@ model Ad {
   durationSeconds Int?
   creativeBrief   Json?
   pipelineSpec    Json?
+  workflowMode    WorkflowMode @default(LEGACY_AUTOMATIC)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -97,6 +100,7 @@ model Ad {
   providerJobs    ProviderJob[]
   renderOutputs   RenderOutput[]
   shots           Shot[]
+  artifacts       CreativeArtifact[]
 
   @@index([projectId])
   @@index([projectId, status])
@@ -145,6 +149,13 @@ model PipelineJob {
   startedAt      DateTime?
   completedAt    DateTime?
   ad             Ad                @relation(fields: [adId], references: [id], onDelete: Cascade)
+  idempotencyKey String?
+  snapshotHash   String?
+  leaseToken     String?
+  leaseExpiresAt DateTime?
+  heartbeatAt    DateTime?
+  cancelRequestedAt DateTime?
+  creativeRevisions CreativeRevision[]
   requestedBy    User              @relation(fields: [requestedById], references: [id], onDelete: Restrict)
   stepRuns       PipelineStepRun[]
   providerJobs   ProviderJob[]
@@ -154,6 +165,8 @@ model PipelineJob {
   @@index([requestedById])
   @@index([status])
   @@map("pipeline_jobs")
+  @@unique([adId, idempotencyKey])
+  @@index([status, leaseExpiresAt])
 }
 
 model PipelineStepRun {
@@ -214,9 +227,12 @@ model Shot {
   promptPayload   Json
   keyframeAssetId String?
   videoAssetId    String?
+  keyframeRevisionId String?
+  videoRevisionId String?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   ad              Ad         @relation(fields: [adId], references: [id], onDelete: Cascade)
+  artifacts       CreativeArtifact[]
 
   @@unique([adId, shotNumber])
   @@index([adId])
@@ -234,6 +250,9 @@ model ProviderJob {
   status         ProviderJobStatus  @default(QUEUED)
   requestPayload Json?
   responsePayload Json?
+  requestFingerprint String?
+  attemptState   String?
+  metadata       Json?
   errorCode      String?
   errorMessage   String?
   createdAt      DateTime           @default(now())
@@ -247,6 +266,7 @@ model ProviderJob {
   @@index([stepRunId])
   @@index([status])
   @@map("provider_jobs")
+  @@unique([jobId, requestFingerprint])
 }
 
 enum AuthProvider {
@@ -288,7 +308,82 @@ enum AssetStatus {
 
 enum PipelineJobType {
   AD_GENERATION
+  GUIDED_GENERATION
   RENDER_EXPORT
+}
+
+model CreativeArtifact {
+  id                 String @id @default(uuid())
+  adId               String
+  kind               CreativeArtifactKind
+  scopeKey           String @default("root")
+  shotId             String?
+  currentRevisionId  String? @unique
+  approvedRevisionId String? @unique
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  ad                 Ad @relation(fields: [adId], references: [id], onDelete: Cascade)
+  shot               Shot? @relation(fields: [shotId], references: [id], onDelete: Cascade)
+  revisions          CreativeRevision[] @relation("ArtifactRevisions")
+  approvals          CreativeApproval[]
+  currentRevision    CreativeRevision? @relation("CurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+  approvedRevision   CreativeRevision? @relation("ApprovedRevision", fields: [approvedRevisionId], references: [id], onDelete: SetNull)
+
+  @@unique([adId, kind, scopeKey])
+  @@index([adId])
+  @@map("creative_artifacts")
+}
+
+model CreativeRevision {
+  id                String @id @default(uuid())
+  artifactId        String
+  version           Int
+  content           Json
+  sourceRevisionIds String[]
+  origin            String
+  schemaVersion     Int @default(1)
+  authorId          String?
+  sourceJobId       String?
+  parentRevisionId  String?
+  createdAt         DateTime @default(now())
+  artifact          CreativeArtifact @relation("ArtifactRevisions", fields: [artifactId], references: [id], onDelete: Cascade)
+  currentFor        CreativeArtifact? @relation("CurrentRevision")
+  approvedFor       CreativeArtifact? @relation("ApprovedRevision")
+  author            User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  sourceJob         PipelineJob? @relation(fields: [sourceJobId], references: [id], onDelete: SetNull)
+  parentRevision    CreativeRevision? @relation("RevisionParent", fields: [parentRevisionId], references: [id], onDelete: SetNull)
+  childRevisions    CreativeRevision[] @relation("RevisionParent")
+  approvals         CreativeApproval[]
+
+  @@unique([artifactId, version])
+  @@index([artifactId])
+  @@map("creative_revisions")
+}
+
+enum CreativeArtifactKind {
+  SCRIPT
+  STORYBOARD
+  SHOT_PLAN
+  TIMELINE
+}
+
+enum WorkflowMode {
+  LEGACY_AUTOMATIC
+  GUIDED
+}
+
+model CreativeApproval {
+  id          String @id @default(uuid())
+  artifactId  String
+  revisionId  String
+  approvedById String
+  createdAt   DateTime @default(now())
+  artifact    CreativeArtifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  revision    CreativeRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  approvedBy  User @relation(fields: [approvedById], references: [id], onDelete: Restrict)
+
+  @@unique([artifactId, revisionId, approvedById])
+  @@map("creative_approvals")
 }
 
 enum PipelineJobStatus {

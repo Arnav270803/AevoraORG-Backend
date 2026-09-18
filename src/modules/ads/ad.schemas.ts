@@ -8,6 +8,7 @@ export const adIdParamSchema = z.object({
 });
 
 export const createAdSchema = z.object({
+  workflowMode: z.enum(["LEGACY_AUTOMATIC", "GUIDED"]).optional(),
   title: optionalTrimmedString(160),
   productName: optionalTrimmedString(160),
   brandName: optionalTrimmedString(160),

@@ -2,6 +2,9 @@ import type { AdStatus, Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { NotFoundError } from "../../utils/errors";
 import type { CreateAdInput, UpdateAdInput } from "./ad.schemas";
+import { transaction, lockAd, isGuided } from "../workspace/workspace.repository";
+import { conflict } from "../workspace/workspace.rules";
+import { publicJob } from "../workspace/workspace.service";
 
 export const adService = {
   async createAd(ownerId: string, projectId: string, input: CreateAdInput) {
@@ -21,6 +24,7 @@ export const adService = {
         durationSeconds: input.durationSeconds,
         creativeBrief: toJson(input.creativeBrief),
         pipelineSpec: toJson(input.pipelineSpec),
+        workflowMode: input.workflowMode,
       },
     });
   },
@@ -67,13 +71,18 @@ export const adService = {
       throw new NotFoundError("Ad was not found.");
     }
 
-    return ad;
+    return { ...ad, pipelineJobs: ad.pipelineJobs.map((job) => isGuided(job) ? publicJob(job) : job),
+      providerJobs: ad.providerJobs.map(({ id, provider, model, status, createdAt }) => ({ id, provider, model, status, createdAt })) };
   },
 
   async updateAd(ownerId: string, adId: string, input: UpdateAdInput) {
-    await assertAdOwner(ownerId, adId);
-
-    return prisma.ad.update({
+    return transaction(async (tx) => {
+      const existing = await lockAd(tx, adId, ownerId);
+      const hasArtifacts = await tx.creativeArtifact.count({ where: { adId } });
+      if ((existing.workflowMode === "GUIDED" || hasArtifacts) && input.status && input.status !== "ARCHIVED") conflict("Guided completion status is managed by the workflow, not by ad edits.");
+      if (hasArtifacts && input.workflowMode === "LEGACY_AUTOMATIC") conflict("This ad has guided revisions. Create a separate automatic ad to preserve this revision history.");
+      if (hasArtifacts && Object.keys(input).some((key) => !["title", "status", "workflowMode"].includes(key))) conflict("This ad has guided revisions. Edit its script, storyboard, shots, or timeline through the workspace.");
+      return tx.ad.update({
       where: { id: adId },
       data: {
         title: input.title,
@@ -88,7 +97,9 @@ export const adService = {
         durationSeconds: input.durationSeconds,
         creativeBrief: toJson(input.creativeBrief),
         pipelineSpec: toJson(input.pipelineSpec),
+        workflowMode: input.workflowMode,
       },
+      });
     });
   },
 

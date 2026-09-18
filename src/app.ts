@@ -13,6 +13,7 @@ import { healthRouter } from "./modules/health/health.routes";
 import { internalPipelineRouter } from "./modules/internal/internal-pipeline.routes";
 import { pipelineJobRouter } from "./modules/pipeline-jobs/pipeline-job.routes";
 import { projectRouter } from "./modules/projects/project.routes";
+import { guidedWorkerRouter } from "./modules/workspace/workspace.routes";
 
 export function createApp() {
   const app = express();
@@ -47,6 +48,7 @@ export function createApp() {
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/internal", internalPipelineRouter);
+  app.use("/api/internal/guided-jobs", guidedWorkerRouter);
   app.use("/api/projects", projectRouter);
   app.use("/api/ads", adRouter);
   app.use("/api/pipeline-jobs", pipelineJobRouter);

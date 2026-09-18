@@ -57,5 +57,8 @@ function extensionForMimeType(mimeType: string) {
   if (mimeType === "image/jpeg") return ".jpg";
   if (mimeType === "image/png") return ".png";
   if (mimeType === "image/webp") return ".webp";
+  if (mimeType === "audio/mpeg") return ".mp3";
+  if (mimeType === "audio/wav") return ".wav";
+  if (mimeType === "audio/ogg") return ".ogg";
   return ".bin";
 }

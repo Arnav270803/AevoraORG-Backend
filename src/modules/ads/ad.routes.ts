@@ -6,10 +6,12 @@ import { assetRouter } from "../assets/asset.routes";
 import { adPipelineJobRouter } from "../pipeline-jobs/pipeline-job.routes";
 import { getAd, updateAd } from "./ad.controller";
 import { adIdParamSchema, updateAdSchema } from "./ad.schemas";
+import { workspaceRouter } from "../workspace/workspace.routes";
 
 export const adRouter = Router();
 
 adRouter.use(authenticate);
+adRouter.use("/:adId", workspaceRouter);
 
 adRouter.get("/:adId", validateParams(adIdParamSchema), asyncHandler(getAd));
 adRouter.patch("/:adId", validateParams(adIdParamSchema), validateBody(updateAdSchema), asyncHandler(updateAd));
