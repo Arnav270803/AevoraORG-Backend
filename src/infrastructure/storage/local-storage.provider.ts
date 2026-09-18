@@ -40,7 +40,7 @@ export class LocalStorageProvider implements StorageProvider {
   }
 }
 
-function safeFileName(fileName: string, mimeType: string) {
+export function safeFileName(fileName: string, mimeType: string) {
   const extension = extensionForMimeType(mimeType);
   const stem = fileName
     .trim()

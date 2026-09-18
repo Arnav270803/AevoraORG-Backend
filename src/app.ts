@@ -18,6 +18,9 @@ import { guidedWorkerRouter } from "./modules/workspace/workspace.routes";
 export function createApp() {
   const app = express();
 
+  // Production runs behind Caddy; trust its X-Forwarded-For so rate limits see real client IPs.
+  app.set("trust proxy", 1);
+
   app.use(helmet());
   app.use(cors(corsOptions));
   app.use(express.json({ limit: "10mb" }));

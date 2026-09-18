@@ -18,6 +18,11 @@ const envSchema = z.object({
   LOCAL_STORAGE_PUBLIC_BASE_URL: z.string().url().optional(),
   PIPELINE_LOCAL_OUTPUT_DIR: z.string().min(1).default("../Aevora_Agentic_core/output"),
   AEVORA_PIPELINE_SERVICE_TOKEN: z.string().min(16).default("dev-pipeline-service-token"),
+  STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+  S3_BUCKET: z.string().min(1).optional(),
+  S3_REGION: z.string().min(1).optional(),
+  S3_ENDPOINT: z.string().url().optional(),
+  STORAGE_PUBLIC_BASE_URL: z.string().url().optional(),
 });
 
 export const env = envSchema.parse(process.env);

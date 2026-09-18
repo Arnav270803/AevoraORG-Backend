@@ -1,0 +1,7 @@
+{$API_DOMAIN} {
+	# Worker-only routes stay private: the worker calls the backend directly on the Docker network.
+	@internal path /api/internal/*
+	respond @internal 404
+
+	reverse_proxy backend:4000
+}

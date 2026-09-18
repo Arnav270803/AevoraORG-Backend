@@ -1,0 +1,95 @@
+# Production stack for a single server: Postgres, backend, worker and Caddy (HTTPS).
+# Expects Aevora_Agentic_core to be checked out next to Aevora_Backend.
+# Start from the Aevora_Backend folder:
+#   docker compose -f deploy/docker-compose.prod.yml up -d --build
+# Settings are read from deploy/.env (copy deploy/.env.example).
+name: aevora
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aevora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: aevora
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aevora -d aevora"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ..
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      DATABASE_URL: postgresql://aevora:${POSTGRES_PASSWORD}@postgres:5432/aevora
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in deploy/.env}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET in deploy/.env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET in deploy/.env}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?Set FRONTEND_ORIGIN in deploy/.env}
+      BACKEND_URL: https://${API_DOMAIN:?Set API_DOMAIN in deploy/.env}
+      AEVORA_PIPELINE_SERVICE_TOKEN: ${AEVORA_PIPELINE_SERVICE_TOKEN:?Set AEVORA_PIPELINE_SERVICE_TOKEN in deploy/.env}
+      STORAGE_DRIVER: s3
+      S3_BUCKET: ${S3_BUCKET:?Set S3_BUCKET in deploy/.env}
+      S3_REGION: ${S3_REGION:?Set S3_REGION in deploy/.env}
+      STORAGE_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:?Set MEDIA_PUBLIC_BASE_URL in deploy/.env}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in deploy/.env}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in deploy/.env}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  worker:
+    build: ../../Aevora_Agentic_core
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      BACKEND_URL: http://backend:4000
+      AEVORA_PIPELINE_SERVICE_TOKEN: ${AEVORA_PIPELINE_SERVICE_TOKEN}
+      PIPELINE_PROVIDER_MODE: ${PIPELINE_PROVIDER_MODE:-mock}
+      PIPELINE_STORAGE_DRIVER: s3
+      PIPELINE_LOCAL_OUTPUT_DIR: /app/output
+      PIPELINE_LOCAL_OUTPUT_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_REGION: ${S3_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LTX_API_KEY: ${LTX_API_KEY:-}
+    volumes:
+      - worker-output:/app/output
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  postgres-data:
+  worker-output:
+  caddy-data:
+  caddy-config:
