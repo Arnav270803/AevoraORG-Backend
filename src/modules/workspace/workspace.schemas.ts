@@ -63,7 +63,7 @@ export const operationSchema = z.enum(["GENERATE_SCRIPT", "GENERATE_STORYBOARD",
 export const actionSchema = z.object({
   operation: operationSchema, shotId: uuid.optional(), expectedRevisionId: expectedRevisionSchema,
   idempotencyKey: z.string().min(8).max(180).regex(/^[A-Za-z0-9_-]+$/),
-  settings: z.object({ providerMode: z.enum(["mock", "google", "runpod", "fal", "openai", "ltx"]).optional(), imageProvider: z.string().max(80).optional() }).strict().optional(),
+  settings: z.object({ providerMode: z.enum(["mock", "google", "runpod", "fal", "openai", "ltx", "modal"]).optional(), imageProvider: z.string().max(80).optional() }).strict().optional(),
 });
 export const leaseSchema = z.object({ leaseToken: uuid });
 export const attemptSchema = leaseSchema.extend({
