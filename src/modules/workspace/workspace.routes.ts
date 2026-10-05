@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { authenticateInternal } from "../../middleware/authenticate-internal";
 import { validateBody, validateParams } from "../../middleware/validate";
+import { startWorker, startWorkerIfWorkIsWaiting } from "../../infrastructure/worker/worker-trigger";
 import { asyncHandler } from "../../utils/async-handler";
 import { getAuthenticatedUserId } from "../../utils/request-auth";
 import { dispatchAction } from "./workspace.actions";
@@ -16,7 +17,11 @@ const revisionParams = adParams.extend({ revisionId: z.string().uuid() });
 const jobParams = z.object({ jobId: z.string().uuid() });
 export const workspaceRouter = Router({ mergeParams: true });
 workspaceRouter.use(validateParams(adParams));
-workspaceRouter.get("/workspace", asyncHandler(async (req, res) => { res.json({ workspace: await workspaceService.getWorkspace(getAuthenticatedUserId(req), req.params.adId) }); }));
+workspaceRouter.get("/workspace", asyncHandler(async (req, res) => {
+  const workspace = await workspaceService.getWorkspace(getAuthenticatedUserId(req), req.params.adId);
+  await startWorkerIfWorkIsWaiting(req.params.adId);
+  res.json({ workspace });
+}));
 workspaceRouter.patch("/script", validateBody(saveScriptSchema), asyncHandler(async (req, res) => { res.json({ workspace: await workspaceService.saveScript(getAuthenticatedUserId(req), req.params.adId, req.body) }); }));
 workspaceRouter.patch("/storyboard", validateBody(saveStoryboardSchema), asyncHandler(async (req, res) => { res.json({ workspace: await workspaceService.saveStoryboard(getAuthenticatedUserId(req), req.params.adId, req.body) }); }));
 workspaceRouter.post("/shots", validateBody(createShotSchema), asyncHandler(async (req, res) => { res.json({ workspace: await workspaceService.createShot(getAuthenticatedUserId(req), req.params.adId, req.body) }); }));
@@ -25,7 +30,11 @@ workspaceRouter.patch("/timeline", validateBody(saveTimelineSchema), asyncHandle
 workspaceRouter.post("/approvals", validateBody(approvalSchema), asyncHandler(async (req, res) => { res.json({ workspace: await workspaceService.approve(getAuthenticatedUserId(req), req.params.adId, req.body) }); }));
 workspaceRouter.post("/revisions/:revisionId/restore", validateParams(revisionParams), asyncHandler(async (req, res) => { res.json({ workspace: await workspaceService.restore(getAuthenticatedUserId(req), req.params.adId, req.params.revisionId) }); }));
 workspaceRouter.post("/shots/:shotId/select-asset", validateParams(shotParams), validateBody(selectAssetSchema), asyncHandler(async (req, res) => { res.json({ workspace: await workspaceService.selectAsset(getAuthenticatedUserId(req), req.params.adId, req.params.shotId, req.body) }); }));
-workspaceRouter.post("/actions", validateBody(actionSchema), asyncHandler(async (req, res) => { res.status(202).json({ job: await dispatchAction(getAuthenticatedUserId(req), req.params.adId, req.body) }); }));
+workspaceRouter.post("/actions", validateBody(actionSchema), asyncHandler(async (req, res) => {
+  const job = await dispatchAction(getAuthenticatedUserId(req), req.params.adId, req.body);
+  if (job.status === "QUEUED") await startWorker();
+  res.status(202).json({ job });
+}));
 workspaceRouter.post("/import-legacy", asyncHandler(async (req, res) => { res.json({ workspace: await importLegacy(getAuthenticatedUserId(req), req.params.adId) }); }));
 
 export const guidedWorkerRouter = Router();

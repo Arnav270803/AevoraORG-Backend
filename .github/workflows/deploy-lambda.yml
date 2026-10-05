@@ -1,0 +1,62 @@
+# Builds Dockerfile.lambda, pushes it to Amazon ECR and points the Lambda function at it.
+# Needs the repository secrets AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (an IAM user that
+# can push to ECR and update the function). Set the AWS_REGION repository variable when the
+# function is not in ap-south-1 (Mumbai).
+name: Deploy API to AWS Lambda
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-lambda
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
+  ECR_REPOSITORY: aevora-api
+  LAMBDA_FUNCTION: aevora-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create the ECR repository on the first run
+        run: |
+          if ! aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1; then
+            aws ecr create-repository --repository-name "$ECR_REPOSITORY" >/dev/null
+            # Keep only the 5 newest images so storage costs stay flat.
+            aws ecr put-lifecycle-policy --repository-name "$ECR_REPOSITORY" --lifecycle-policy-text \
+              '{"rules":[{"rulePriority":1,"description":"Keep the 5 newest images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}' >/dev/null
+          fi
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push the image
+        run: |
+          IMAGE="${{ steps.ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}"
+          docker build --platform linux/amd64 --provenance=false -f Dockerfile.lambda -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Point the Lambda function at the new image
+        run: |
+          if aws lambda get-function --function-name "$LAMBDA_FUNCTION" >/dev/null 2>&1; then
+            aws lambda update-function-code --function-name "$LAMBDA_FUNCTION" --image-uri "$IMAGE" >/dev/null
+            echo "Updated $LAMBDA_FUNCTION to $IMAGE"
+          else
+            echo "::notice::Lambda function $LAMBDA_FUNCTION does not exist yet. Create it from this image: $IMAGE"
+          fi
