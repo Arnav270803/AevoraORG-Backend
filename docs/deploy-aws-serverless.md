@@ -8,7 +8,7 @@ Nothing runs while nobody uses the app, except the database's storage.
 | Uploads and generated media | S3 bucket + CloudFront |
 | API (this repo) | Lambda `aevora-api` with a Function URL. `Dockerfile.lambda` runs the Express app through the AWS Lambda Web Adapter |
 | Pipeline worker (AevoraORG-Pipeline) | Lambda `aevora-worker`. The API invokes it when a job is queued; it runs every waiting job and stops |
-| Database | Aurora Serverless v2 (PostgreSQL), minimum 0 ACUs, so it pauses when idle |
+| Database | Aurora Serverless v2 (PostgreSQL), minimum 0 ACUs, so it pauses when idle. On a Free plan account, RDS PostgreSQL on the free-tier size (see step 3) |
 
 Limits of this setup:
 - The first request after a quiet period takes about 15-20 seconds while the database resumes.
@@ -52,32 +52,34 @@ Push to `main` in both repos (or Actions → "Deploy … to AWS Lambda" → Run 
 
 ## 3. Database
 
-RDS → Create database:
+RDS → Create database → **Full configuration**. Easy create cannot turn on public access, and the express configuration only accepts IAM tokens, not the password the app uses.
 - Engine: **Aurora (PostgreSQL Compatible)**, newest version offered. Template: Dev/Test.
-- Cluster identifier `aevora-db`, master username `aevora`, credentials **Self managed**, password = `DB_PASSWORD`.
+- Cluster identifier `aevora-db`, master username `postgres`, credentials **Self managed**, password = `DB_PASSWORD`.
 - Instance configuration: **Serverless v2**, minimum **0** ACUs, maximum **1** ACU, pause after inactivity **10 minutes**.
 - No Aurora Replica. Connectivity: default VPC, **Public access: Yes**, new security group `aevora-db-public`.
 - Additional configuration: initial database name `aevora`, deletion protection on. Leave Enhanced Monitoring off.
 
+On an AWS **Free plan** account, Aurora is only offered with express configuration, and only the free-tier size of the other engines can be chosen. Either upgrade to the Paid plan first (remaining credits carry over), or create a regular database: Engine **PostgreSQL**, Template **Free tier** (db.t4g.micro), storage autoscaling off, and the same credentials, connectivity and initial database name. Everything else in this guide stays the same. That database runs all the time instead of pausing, about $25 a month at Mumbai prices, paid from credits while they last.
+
 When it is Available:
-1. Copy the **writer endpoint** (`DB_ENDPOINT`).
+1. Copy the **writer endpoint** (Aurora) or the **endpoint** (PostgreSQL) as `DB_ENDPOINT`.
 2. Open security group `aevora-db-public` → Inbound rules → set the PostgreSQL (5432) source to **Anywhere-IPv4**. Lambda has no fixed IP address.
 
 ```text
-DATABASE_URL=postgresql://aevora:DB_PASSWORD@DB_ENDPOINT:5432/aevora?sslmode=require&connection_limit=3&connect_timeout=30&pool_timeout=30
+DATABASE_URL=postgresql://postgres:DB_PASSWORD@DB_ENDPOINT:5432/aevora?sslmode=require&connection_limit=3&connect_timeout=30&pool_timeout=30
 ```
 
 Create the tables from your computer, inside this repo (`git pull` first, then `npm install`):
 
 ```powershell
 # Windows PowerShell
-$env:DATABASE_URL="postgresql://aevora:DB_PASSWORD@DB_ENDPOINT:5432/aevora?sslmode=require&connect_timeout=30"
+$env:DATABASE_URL="postgresql://postgres:DB_PASSWORD@DB_ENDPOINT:5432/aevora?sslmode=require&connect_timeout=30"
 npx prisma migrate deploy
 ```
 
 ```bash
 # macOS / Linux
-DATABASE_URL="postgresql://aevora:DB_PASSWORD@DB_ENDPOINT:5432/aevora?sslmode=require&connect_timeout=30" npx prisma migrate deploy
+DATABASE_URL="postgresql://postgres:DB_PASSWORD@DB_ENDPOINT:5432/aevora?sslmode=require&connect_timeout=30" npx prisma migrate deploy
 ```
 
 ## 4. Media bucket
