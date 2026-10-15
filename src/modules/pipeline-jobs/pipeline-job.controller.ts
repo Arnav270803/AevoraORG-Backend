@@ -1,10 +1,12 @@
 import type { RequestHandler } from "express";
 import { HTTP_STATUS } from "../../constants/http";
+import { startWorker } from "../../infrastructure/worker/worker-trigger";
 import { getAuthenticatedUserId } from "../../utils/request-auth";
 import { pipelineJobService } from "./pipeline-job.service";
 
 export const createPipelineJob: RequestHandler = async (req, res) => {
   const job = await pipelineJobService.createPipelineJob(getAuthenticatedUserId(req), req.params.adId, req.body);
+  await startWorker();
 
   res.status(HTTP_STATUS.CREATED).json({ job });
 };

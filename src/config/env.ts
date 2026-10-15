@@ -23,6 +23,8 @@ const envSchema = z.object({
   S3_REGION: z.string().min(1).optional(),
   S3_ENDPOINT: z.string().url().optional(),
   STORAGE_PUBLIC_BASE_URL: z.string().url().optional(),
+  // Set on AWS Lambda: the API starts this worker function when jobs are queued.
+  WORKER_FUNCTION_NAME: z.string().min(1).optional(),
 });
 
 export const env = envSchema.parse(process.env);

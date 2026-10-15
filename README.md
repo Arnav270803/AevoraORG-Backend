@@ -369,6 +369,10 @@ Use `npm run dev` in `Aevora_Agentic_core` for a polling worker loop.
 - Zod validates request bodies and route params.
 - Prisma migration `20260627075113_backend_foundation` adds the backend foundation tables and enums.
 
+## Deploying to AWS
+
+`docs/deploy-aws-serverless.md` is the step-by-step guide for the low-cost setup: this API on AWS Lambda (`Dockerfile.lambda`, deployed by `.github/workflows/deploy-lambda.yml`), the pipeline worker on Lambda, Aurora Serverless v2 and Amplify for the website. When `WORKER_FUNCTION_NAME` is set, the API invokes that worker function whenever a job is queued. `deploy/docker-compose.prod.yml` remains the single-server alternative.
+
 ## Local Docker Database
 
 The local database runs Postgres in Docker and matches the default `DATABASE_URL` in `.env.example`:
